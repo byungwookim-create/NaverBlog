@@ -30,6 +30,7 @@ python -m venv .venv
 2. 의존성 설치
 ```powershell
 pip install -r requirements.txt
+playwright install chromium
 ```
 
 3. 환경변수 파일 생성

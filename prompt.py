@@ -4,9 +4,14 @@ from dataclasses import dataclass
 
 @dataclass
 class BlogInput:
+    map_url: str
     place_name: str
     business_hours: str
     location_info: str
+    home_tab_info: str
+    menu_tab_info: str
+    info_tab_info: str
+    news_tab_info: str
     parking_or_tips: str
     interior_and_menu: str
     signature_taste: str
@@ -15,16 +20,29 @@ class BlogInput:
 
 PROMPT_BUILDER_SYSTEM = """
 너는 전문 블로그 에디터다.
-역할은 '블로그 본문 작성'이 아니라, 블로그 작성 모델에게 전달할 '최종 작성 지시 프롬프트'를 만드는 것이다.
+역할은 ‘블로그 본문을 직접 작성하는 것’이 아니라, 블로그 작성 모델에게 전달할 최종 작성 지시 프롬프트를 설계하는 것이다.
 
 절대 규칙:
-1) 실제 블로그 본문 문단을 쓰지 말 것.
-2) 출력은 오직 '작성용 프롬프트' 한 개만 제공할 것.
-3) 프롬프트 안에 반드시 포함:
-- SEO 구조(제목, 도입, 소제목, 마무리, CTA)
-- 톤/키워드/핵심 정보 반영 지시
-- 허위 정보 금지 지시
-4) 자연스러운 한국어 문체로 작성 지시를 구성할 것.
+1. 실제 블로그 본문 문장이나 문단을 직접 작성하지 말 것. 예시 문단도 쓰지 말 것.
+2. 출력은 오직 ‘작성용 최종 프롬프트’ 한 개만 제공할 것. 설명, 해설, 서론, 부연 설명을 덧붙이지 말 것.
+3. 프롬프트 형식은 자연스러운 한국어의 일반 텍스트 지시문으로 작성할 것. 과도한 Markdown 문법(복잡한 표, 과도한 헤더 구조, 장식용 기호, 이모지 등)은 사용하지 말 것.
+4. SEO 최적화 전략, 검색 노출 전략, 키워드 밀도, 메타 설명 작성 지시, CTA(구매/문의/구독 유도 문구 작성 지시)는 절대 포함하지 말 것.
+5. 반드시 다음 요소를 포함할 것
+ - 글의 전체 톤앤매너에 대한 구체적 지시
+ - 반드시 포함해야 할 핵심 키워드 및 핵심 정보 반영 지시
+ - 허위 정보, 과장, 추측성 서술, 확인되지 않은 사실 작성 금지 지시
+ - 실제 경험 기반 서술 여부에 대한 명확한 지시
+ - 독자의 이해도를 고려한 설명 수준 조절 지시
+6. 작성 모델이 임의로 새로운 사실을 창작하지 않도록 “제공된 정보 범위 내에서만 작성할 것”을 반드시 명시할 것.
+
+프롬프트 설계 원칙:
+모호한 표현(적당히, 자연스럽게, 잘 써라 등)을 사용하지 말 것.
+작성 모델이 그대로 따라 작성하면 완성도 높은 글이 나오도록 구체적이고 실행 가능한 지시문으로 작성할 것.
+추상적인 감성 지시보다 구조, 기준, 금지사항을 명확히 제시할 것.
+
+출력 형식:
+오직 하나의 완성된 작성 지시 프롬프트만 제공할 것.
+설명 문장, 해설, 안내 문구는 절대 추가하지 말 것.
 """.strip()
 
 BLOG_WRITER_SYSTEM = """
@@ -99,9 +117,14 @@ COMMENT_WRITER_SYSTEM = """
 def format_user_facts(payload: BlogInput) -> str:
     """사용자 입력을 에이전트 전달용 메모 문자열로 정리합니다."""
     return (
+        f"- 네이버 지도 URL: {payload.map_url}\n"
         f"- 장소: {payload.place_name}\n"
         f"- 영업시간: {payload.business_hours}\n"
         f"- 위치/주변 정보: {payload.location_info}\n"
+        f"- 홈 탭 수집 정보: {payload.home_tab_info}\n"
+        f"- 메뉴 탭 수집 정보: {payload.menu_tab_info}\n"
+        f"- 정보 탭 수집 정보: {payload.info_tab_info}\n"
+        f"- 소식 탭 수집 정보: {payload.news_tab_info}\n"
         f"- 주차/유용한 정보: {payload.parking_or_tips}\n"
         f"- 매장 내부/먹은 메뉴: {payload.interior_and_menu}\n"
         f"- 인상 깊은 맛/시그니처: {payload.signature_taste}\n"
