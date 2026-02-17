@@ -112,6 +112,42 @@ def _extract_tab_links(frame) -> dict[str, str]:
     return frame.evaluate(script)
 
 
+def _expand_business_hours(frame) -> bool:
+    script = """
+() => {
+  const cands = Array.from(document.querySelectorAll('[aria-expanded="false"], a, button, [role="button"]'));
+  const target = cands.find((el) => {
+    const t = (el.innerText || '').trim();
+    if (!t) return false;
+    const hasExpandWord = t.includes('펼쳐보기') || t.includes('더보기');
+    const hasTimePattern = /\\b\\d{1,2}:\\d{2}\\b/.test(t) || t.includes('라스트오더');
+    return hasExpandWord && hasTimePattern;
+  });
+  if (target) {
+    target.click();
+    return true;
+  }
+  return false;
+}
+"""
+    try:
+        # lazy 렌더링 대응: 스크롤로 영업시간 블록 로드 유도
+        frame.evaluate(
+            """
+() => {
+  const box = document.querySelector('#_pcmap_list_scroll_container') || document.scrollingElement || document.documentElement;
+  if (!box) return;
+  const original = box.scrollTop || 0;
+  box.scrollTop = Math.min(500, (box.scrollHeight || 500));
+  box.scrollTop = original;
+}
+"""
+        )
+        return bool(frame.evaluate(script))
+    except Exception:
+        return False
+
+
 def _extract_tab_sections_text(frame) -> str:
     script = """
 () => {
@@ -186,7 +222,7 @@ def crawl_place_tabs(map_url: str, *, timeout_ms: int = 30000, headless: bool = 
             page.set_default_timeout(timeout_ms)
 
             page.goto(map_entry_home, wait_until="domcontentloaded")
-            page.wait_for_timeout(2500)
+            page.wait_for_timeout(3500)
             frame = _get_place_frame(page)
             if frame is None:
                 raise RuntimeError("네이버 장소 패널 iframe을 찾지 못했습니다.")
@@ -195,6 +231,11 @@ def crawl_place_tabs(map_url: str, *, timeout_ms: int = 30000, headless: bool = 
             label_to_key = {"홈": "home", "메뉴": "menu", "정보": "info", "소식": "news"}
 
             # 우선 홈은 현재 페이지에서 즉시 수집
+            for _ in range(4):
+                if _expand_business_hours(frame):
+                    page.wait_for_timeout(700)
+                    break
+                page.wait_for_timeout(500)
             result["home"] = _extract_tab_sections_text(frame) or _extract_visible_panel_text(frame)
 
             for label, key in label_to_key.items():
@@ -210,6 +251,12 @@ def crawl_place_tabs(map_url: str, *, timeout_ms: int = 30000, headless: bool = 
                 page.goto(tab_url, wait_until="domcontentloaded")
                 page.wait_for_timeout(2200)
                 tab_frame = _get_place_frame(page) or page.main_frame
+                if key in {"home", "info"}:
+                    for _ in range(3):
+                        if _expand_business_hours(tab_frame):
+                            page.wait_for_timeout(700)
+                            break
+                        page.wait_for_timeout(400)
                 result[key] = _extract_tab_sections_text(tab_frame) or _extract_visible_panel_text(tab_frame)
 
             context.close()
